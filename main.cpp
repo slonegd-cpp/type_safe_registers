@@ -5,11 +5,15 @@
 
 
 
-
+// значение данного типа передаются в функцию, он от него нельзя наследоваться
 enum struct Enum1 { _0, _1, _2, _3 };
+// поэтому создаётся дополнительный тип, описание свойств,
+// в дальнейшем всё равно надо знать как минимум маску
+// для определения куда значение записывать
 struct Enum1_traits { 
     static constexpr uint32_t mask = 0b111;
 };
+// нужна функция, связывающая эти 2 типа, используем value based подход
 constexpr auto traits(Enum1) { return type_identity<Enum1_traits>{}; }
 
 enum struct Enum2 { _0, _1, _2, _3 };
@@ -35,7 +39,7 @@ constexpr auto traits(Enum4) { return type_identity<Enum4_traits>{}; }
 
 
 
-// bind types by inheritance
+// наследыванием показываем какие перечисления (их свойства) относятся к какомо регистру
 struct Register1 : Enum1_traits, Enum2_traits {
     static constexpr uint32_t address = 0x80000000;
 };
@@ -55,12 +59,19 @@ struct is_base_for {
 
 template<class Periph, class...Ts>
 constexpr void set(Periph periph, Ts...args) {
+    // вся магия будет тут
+    
+    // из аргументов достаём их свойства и упаковываем, используя value based подход
     auto traits_pack = make_type_pack(traits(args)...);
+    // и теперь можно проверить все ли свойства аргументов являются базовыми для заданной переферии
     static_assert(all_of(traits_pack, value_fn<is_base_for, Periph>{}));
 };
 
 
+// наследыванием показываем какие регистры относятся к какой переферии
 struct Periph1 : Register1 {
+    // у переферии описываем необходимый метод, передавая в свободную функцию
+    // тип переферии и пробрасываем аргументы
     template<class...Ts>
     static constexpr void set(Ts...args) {
         ::set(Periph1{}, args...);
