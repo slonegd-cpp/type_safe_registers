@@ -1,5 +1,5 @@
 all: submodule
-	g++ -std=c++17 -I./value_based_meta main.cpp
+	g++ -std=c++17 -g -I./value_based_meta main.cpp
 
 submodule:
 	git submodule update --init
