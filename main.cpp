@@ -1,7 +1,7 @@
 // abstract concept for 32 bit mcu
 #include <cstdint> // std::size_t
-#include <type_traits>
 #include "type_pack.hpp"
+#include "registers_set.hpp"
 
 
 
@@ -34,12 +34,9 @@ struct Enum4_traits {
 };
 constexpr auto traits(Enum4) { return type_identity<Enum4_traits>{}; }
 
-
-
-
-
-
 // наследыванием показываем какие перечисления (их свойства) относятся к какому регистру
+// быть может здесь надо не наследования применять, а агрегацию, 
+// по аналогии с тем как регистры храняться в переферии
 struct Register1 : Enum1_traits, Enum2_traits {
     // храним смещение регистра относительно адреса переферии
     static constexpr std::size_t offset = 0x0;
@@ -51,46 +48,24 @@ struct Register3 : Enum4_traits {
     static constexpr std::size_t offset = 0x8;
 };
 
-
-// need to change Derived and Base for work with all_of function of type_pack
-template <class Derived, class Base>
-struct is_base_for {
-    static constexpr auto value = std::is_base_of<Base, Derived>::value;
-};
-
-// дополнительный парамет - адрес переферии, относительно которого нужно 
-// будет устанавливать значения из перечислений
-template<class Periph, class...Ts>
-constexpr void set(Periph periph, std::size_t address, Ts...args) {
-    // вся магия будет тут
-    
-    // из аргументов достаём их свойства и упаковываем, используя value based подход
-    auto traits_pack = make_type_pack(traits(args)...);
-    // и теперь можно проверить все ли свойства аргументов являются базовыми для заданной переферии
-    static_assert(all_of(traits_pack, value_fn<is_base_for, Periph>{}), "one of arguments in set method don`t belong to periph type");
-};
-
-
-// наследыванием показываем какие регистры относятся к какой переферии
-struct Periph1 : Register1, Register2 {};
-struct Periph2 : Register3 {};
-
 // сразу надо задуматься о тестировании
 // конкретная переферия (тут и далее условно gpioa) должна располaгаться на определённом адресе
 // передадим информцию об этом через параметры шаблона
 // у класса Address должно быть статическое поле address
 template<class Address>
-// наследоваться необходимо от класса, который хранит всё "дерево" наследования
-// чтобы работало всё что задумано
-struct GPIO : Periph1 {
+struct GPIO {
     // а параметр шаблона определим из конструктора
     GPIO(Address) {}
 
+    // наследование не очень подошло, поскольку не нашел способа из наследуемых сделать вот это
+    // тут показываем с какими регистрами работает переферия
+    static constexpr auto registers = type_pack<Register1, Register2>{};
+
     // у переферии описываем необходимый метод, передавая в свободную функцию
-    // тип переферии, адресс и пробрасываем аргументы
+    // список регистров, адрес и пробрасываем аргументы
     template<class...Ts>
     static constexpr void set(Ts...args) {
-        ::set(Periph1{}, Address::address, args...);
+        ::set(registers, Address::address, args...);
     }
 };
 
@@ -108,18 +83,20 @@ struct GPIOA : GPIO<GPIOA_address> {
 // пример структуры, которая предоставляет адрес динамически (для тестов)
 struct Address {
     static inline std::size_t address;
-    Address(std::size_t address_) { address = address_; }
+    template<class Pointer>
+    Address(Pointer address_) { address = reinterpret_cast<std::size_t>(address_); }
 };
 
 int main() {
-    // если необходимо передать адрес динамически (для тестов), тип пока int
-    auto address = Address{reinterpret_cast<std::size_t>(new(int))};
-    auto mock_gpioa = GPIO{address};
-    mock_gpioa.set(Enum1::_1, Enum2::_3, Enum3::_4); // all ok
-    // mock_gpioa.set(Enum4::_0);                       // must be compilation error
-
     // пример без передачи конкретного адреса
     auto gpioa = GPIOA{};
     gpioa.set(Enum1::_1, Enum2::_3, Enum3::_4); // all ok
     // gpioa.set(Enum4::_0);                       // must be compilation error
+
+
+    // если необходимо передать адрес динамически (для тестов), тип пока int
+    auto address = Address{new(int)};
+    auto mock_gpioa = GPIO{address};
+    mock_gpioa.set(Enum1::_1, Enum2::_3, Enum3::_4); // all ok
+    // mock_gpioa.set(Enum4::_0);                       // must be compilation error
 }
