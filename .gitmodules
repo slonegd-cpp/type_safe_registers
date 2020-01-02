@@ -1,0 +1,3 @@
+[submodule "value_based_meta"]
+	path = value_based_meta
+	url = https://github.com/slonegd-cpp/value_based_meta
