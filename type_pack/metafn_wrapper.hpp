@@ -11,17 +11,12 @@ struct value_fn {
     }
 };
 
-template <template <class...> class F>
-constexpr auto value_fn_v = value_fn<F>{};
-
-template <template <class...> class F>
+template <template <class...> class F, class...Ts>
 struct type_fn {
-    template <class...Ts>
-    constexpr auto operator()(type_identity<Ts>...) {
-        return type_identity<typename F<Ts...>::type>{};
+    template <class...Us>
+    constexpr auto operator()(type_identity<Us>...) {
+        return type_identity<typename F<Ts...,Us...>::type>{};
     }
 };
 
-template <template <class...> class F>
-constexpr auto type_fn_v = type_fn<F>{};
 

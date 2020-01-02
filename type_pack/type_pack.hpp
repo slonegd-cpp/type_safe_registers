@@ -93,6 +93,10 @@ constexpr auto none_of(type_pack<Ts...> pack, F f) {
 
 
 namespace type_pack_test {
+    struct A {};
+    struct B : A {};
+    struct C : B {};
+    struct D {};
     constexpr auto pack = type_pack<int, bool, char>{};
 
     static_assert(size(pack) == 3);
@@ -119,6 +123,7 @@ namespace type_pack_test {
 
     static_assert(all_of(pack, value_fn<std::is_integral>{}));
     static_assert(not all_of(type_pack<int, int*>{}, value_fn<std::is_integral>{}));
+    static_assert(all_of(type_pack<B, C>{}, value_fn<std::is_base_of, A>{}));
 
     static_assert(not any_of(pack, value_fn<std::is_pointer>{}));
     static_assert(any_of(type_pack<int, int*>{}, value_fn<std::is_pointer>{}));
