@@ -11,12 +11,7 @@ struct is_base_one_of {
 
 // по маске определяем насколько нужно сдвинуть значение
 constexpr auto shift(std::size_t mask) {
-    std::size_t result{0};
-    while ((mask & 1) == 0) {
-        result++;
-        mask >>= 1;
-    }
-    return result;
+    return __builtin_ffs(mask) - 1;
 }
 
 static_assert(shift(24) == 3);
