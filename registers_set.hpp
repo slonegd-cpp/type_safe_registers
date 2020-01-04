@@ -35,7 +35,7 @@ constexpr std::size_t register_value(type_identity<Register> reg, Args...args) {
 }
 
 // непосредственно запись в регистр, нужны только адрес и значение
-void write(std::size_t address, std::size_t v) {
+inline void write(std::size_t address, std::size_t v) {
     *reinterpret_cast<std::size_t*>(address) |= v;
 }
 
@@ -46,18 +46,27 @@ constexpr void set(type_pack<Registers...> registers, std::size_t address, Args.
     // вся магия будет тут
     
     // из аргументов достаём их свойства и упаковываем, используя value based подход
-    constexpr auto traits_pack = make_type_pack(traits(type_identity<Args>{})...);
+    constexpr auto args_traits = make_type_pack(traits(type_identity<Args>{})...);
+
     // и теперь можно проверить все ли свойства аргументов являются базовыми для заданной переферии
-    static_assert(all_of(traits_pack, [](auto value){
-        using value_type = typename decltype(value)::type;
-        return (std::is_base_of<value_type, Registers>::value || ...);
+    static_assert(all_of(args_traits, [](auto arg){
+        using arg_type = typename decltype(arg)::type;
+        return (std::is_base_of<arg_type, Registers>::value || ...);
     }), "one of arguments in set method don`t belong to periph type");
 
+    // определяем список регистров, в которые надо записывать данные
+    constexpr auto registers_for_write = filter(registers, [=](auto reg){
+        using reg_type = typename decltype(reg)::type;
+        return any_of(args_traits, [](auto arg){
+            using arg_type = typename decltype(arg)::type;
+            return std::is_base_of_v<arg_type, reg_type>;
+        });
+    });
 
-    // определяем значения в каждом регситре
-    std::size_t values[] = {register_value(type_identity<Registers>{}, args...)...};
-
-    // запись значений в регистры
-    auto i {0};
-    (write(Registers::offset + address, values[i++]), ...);
+    // определяем значения в каждом регистре и пишем в его
+    foreach(registers_for_write, [&](auto i, auto reg){
+        auto value = register_value(reg, args...);
+        auto offset = decltype(reg)::type::offset;
+        write(address + offset, value);
+    });
 };
