@@ -3,12 +3,6 @@
 #include <type_traits>
 #include "type_pack.hpp"
 
-// определяет, является ли T базой хотя бы для одного из Deriveds
-template<class T, class...Deriveds>
-struct is_base_one_of {
-    static constexpr auto value = (std::is_base_of<T, Deriveds>::value || ...);
-};
-
 // по маске определяем насколько нужно сдвинуть значение
 constexpr auto shift(std::size_t mask) {
     return __builtin_ffs(mask) - 1;
@@ -54,7 +48,11 @@ constexpr void set(type_pack<Registers...> registers, std::size_t address, Args.
     // из аргументов достаём их свойства и упаковываем, используя value based подход
     constexpr auto traits_pack = make_type_pack(traits(type_identity<Args>{})...);
     // и теперь можно проверить все ли свойства аргументов являются базовыми для заданной переферии
-    static_assert(all_of(traits_pack, value_first_fn<is_base_one_of, Registers...>{}), "one of arguments in set method don`t belong to periph type");
+    static_assert(all_of(traits_pack, [](auto value){
+        using value_type = typename decltype(value)::type;
+        return (std::is_base_of<value_type, Registers>::value || ...);
+    }), "one of arguments in set method don`t belong to periph type");
+
 
     // определяем значения в каждом регситре
     std::size_t values[] = {register_value(type_identity<Registers>{}, args...)...};
