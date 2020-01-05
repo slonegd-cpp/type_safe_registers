@@ -15,7 +15,7 @@ template<class Register, class Arg>
 constexpr std::size_t arg_value(type_identity<Register>, Arg arg) {
     constexpr auto arg_traits = traits(type_identity<Arg>{});
     // нужен тип со свойствами, чтобы достать маску
-    using Arg_traits = typename decltype(arg_traits)::type;
+    using Arg_traits = TYPE(arg_traits);
     constexpr auto arg_shift = shift(Arg_traits::mask);
     // значение вычисляется только, если аргумент соотвествует регистру
     return std::is_base_of_v<Arg_traits, Register> ? (static_cast<std::size_t>(arg) << arg_shift) : 0;
@@ -50,16 +50,13 @@ constexpr void set(type_pack<Registers...> registers, std::size_t address, Args.
 
     // и теперь можно проверить все ли свойства аргументов являются базовыми для заданной переферии
     static_assert(all_of(args_traits, [](auto arg){
-        using arg_type = typename decltype(arg)::type;
-        return (std::is_base_of<arg_type, Registers>::value || ...);
+        return (std::is_base_of<TYPE(arg), Registers>::value || ...);
     }), "one of arguments in set method don`t belong to periph type");
 
     // определяем список регистров, в которые надо записывать данные
     constexpr auto registers_for_write = filter(registers, [=](auto reg){
-        using reg_type = typename decltype(reg)::type;
         return any_of(args_traits, [](auto arg){
-            using arg_type = typename decltype(arg)::type;
-            return std::is_base_of_v<arg_type, reg_type>;
+            return std::is_base_of_v<TYPE(arg), TYPE(reg)>;
         });
     });
 
